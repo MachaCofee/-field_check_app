@@ -40,4 +40,5 @@ None — all requirements have been completed.
 
 ## Video/Screenshots
 
-(add link to video or screenshots here)
+https://github.com/user-attachments/assets/60e1fad9-9b02-4f8d-8340-1397dcb83f09
+
