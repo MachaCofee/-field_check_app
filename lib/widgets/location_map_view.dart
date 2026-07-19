@@ -129,7 +129,7 @@ class _FullScreenMap extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(
-                    'Double-tap untuk kecilkan',
+                    'Double-tap to minimize',
                     style: TextStyle(color: Colors.white, fontSize: 13),
                   ),
                 ),

@@ -28,6 +28,16 @@ class _NewCheckInScreenState extends State<NewCheckInScreen> {
   String? _locationError;
   bool _isSaving = false;
 
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red.shade700,
+      ),
+    );
+  }
+
   Future<void> _takePhoto() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
@@ -36,12 +46,12 @@ class _NewCheckInScreenState extends State<NewCheckInScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Ambil Gambar'),
+              title: const Text('Take Photo'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Pilih dari Fail'),
+              title: const Text('Choose from Gallery'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
           ],
@@ -51,30 +61,31 @@ class _NewCheckInScreenState extends State<NewCheckInScreen> {
 
     if (source == null) return;
 
-    // Check permission kamera secara eksplisit sebelum buka
-    if (source == ImageSource.camera) {
-      final status = await Permission.camera.status;
+    // Explicitly check permission before opening camera or gallery
+    final permission =
+    source == ImageSource.camera ? Permission.camera : Permission.photos;
 
-      if (status.isDenied) {
-        final result = await Permission.camera.request();
-        if (result.isDenied) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Kebenaran kamera ditolak.')),
-          );
-          return;
-        }
-      }
+    final status = await permission.status;
 
-      if (status.isPermanentlyDenied) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Kebenaran kamera ditolak selamanya. Aktifkan dalam Settings.'),
-          ),
+    if (status.isDenied) {
+      final result = await permission.request();
+      if (result.isDenied) {
+        _showErrorSnackBar(
+          source == ImageSource.camera
+              ? 'Camera permission denied.'
+              : 'Gallery permission denied.',
         );
         return;
       }
+    }
+
+    if (status.isPermanentlyDenied) {
+      _showErrorSnackBar(
+        source == ImageSource.camera
+            ? 'Camera permission permanently denied. Please enable it in Settings.'
+            : 'Gallery permission permanently denied. Please enable it in Settings.',
+      );
+      return;
     }
 
     try {
@@ -89,10 +100,7 @@ class _NewCheckInScreenState extends State<NewCheckInScreen> {
 
       setState(() => _photoFile = savedImage);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tak dapat mengakses gambar. Sila cuba lagi.')),
-      );
+      _showErrorSnackBar('Unable to access the photo. Please try again.');
     }
   }
 
@@ -120,13 +128,11 @@ class _NewCheckInScreenState extends State<NewCheckInScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_photoFile == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Sila ambil gambar dahulu.')));
+      _showErrorSnackBar('Please take a photo first.');
       return;
     }
     if (_latitude == null || _longitude == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Sila dapatkan lokasi GPS dahulu.')));
+      _showErrorSnackBar('Please get the GPS location first.');
       return;
     }
 
@@ -154,6 +160,88 @@ class _NewCheckInScreenState extends State<NewCheckInScreen> {
     super.dispose();
   }
 
+  Widget _buildChecklist() {
+    final steps = [
+      ('Note', _noteController.text.trim().isNotEmpty),
+      ('Photo', _photoFile != null),
+      ('Location', _latitude != null && _longitude != null),
+      ('Save', _photoFile != null && _latitude != null && _longitude != null),
+    ];
+
+    const activeColor = Color(0xFF6B2737);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        children: List.generate(steps.length * 2 - 1, (index) {
+          if (index.isEven) {
+            final stepIndex = index ~/ 2;
+            final (label, isDone) = steps[stepIndex];
+            final isCurrent = !isDone &&
+                (stepIndex == 0 || steps[stepIndex - 1].$2);
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDone ? activeColor : Colors.transparent,
+                    border: Border.all(
+                      color: isDone
+                          ? activeColor
+                          : (isCurrent ? activeColor : Colors.grey.shade400),
+                      width: 2,
+                    ),
+                  ),
+                  child: Center(
+                    child: isDone
+                        ? const Icon(Icons.check, size: 14, color: Colors.white)
+                        : Text(
+                      '${stepIndex + 1}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isCurrent ? activeColor : Colors.grey.shade500,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDone ? activeColor : Colors.grey.shade600,
+                    fontWeight: isDone ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ],
+            );
+          } else {
+            final leftStepDone = steps[index ~/ 2].$2;
+            return Expanded(
+              child: Container(
+                height: 2,
+                margin: const EdgeInsets.only(bottom: 16),
+                color: leftStepDone ? activeColor : Colors.grey.shade300,
+              ),
+            );
+          }
+        }),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -165,16 +253,18 @@ class _NewCheckInScreenState extends State<NewCheckInScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildChecklist(),
               const Text('Note', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
               TextFormField(
                 controller: _noteController,
+                onChanged: (_) => setState(() {}),
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   hintText: 'Enter a short note',
                 ),
                 validator: (value) => (value == null || value.trim().isEmpty)
-                    ? 'Note tidak boleh kosong'
+                    ? 'Note cannot be empty'
                     : null,
               ),
               const SizedBox(height: 20),
@@ -213,7 +303,9 @@ class _NewCheckInScreenState extends State<NewCheckInScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade400),
+                  border: Border.all(
+                    color: _locationError != null ? Colors.red.shade400 : Colors.grey.shade400,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: LocationDisplay(

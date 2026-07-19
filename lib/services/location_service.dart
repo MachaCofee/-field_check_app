@@ -23,20 +23,20 @@ class LocationService {
   static Future<LocationResult> getCurrentLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      throw LocationException('GPS tidak aktif. Sila hidupkan lokasi.');
+      throw LocationException('GPS is not enabled. Please turn on location.');
     }
 
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        throw LocationException('Kebenaran lokasi ditolak.');
+        throw LocationException('Location permission denied.');
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
       throw LocationException(
-        'Kebenaran lokasi ditolak selamanya. Aktifkan dalam Settings.',
+        'Location permission permanently denied. Please enable it in Settings.',
       );
     }
 
@@ -55,7 +55,7 @@ class LocationService {
       );
     } on TimeoutException {
       throw LocationException(
-        'Gagal mendapatkan lokasi dalam masa yang ditetapkan. Sila cuba lagi di kawasan lapang.',
+        'Failed to get location in time. Please try again in an open area.',
       );
     }
   }
